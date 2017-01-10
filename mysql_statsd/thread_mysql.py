@@ -1,9 +1,10 @@
-import time
-import re
 import MySQLdb as mdb
+import re
+import time
 import traceback
-from thread_base import ThreadBase
+
 from preprocessors import (MysqlPreprocessor, InnoDBPreprocessor, ColumnsPreprocessor)
+from thread_base import ThreadBase
 
 
 class ThreadMySQLMaxReconnectException(Exception):
@@ -35,21 +36,20 @@ class ThreadMySQL(ThreadBase):
 
         self.max_reconnect = int(config_dict.get('mysql').get('max_reconnect', 5))
         self.max_recovery = int(config_dict.get('mysql').get('max_recovery', 10))
-        
-        #Set the stats checks for MySQL
+
+        # Set the stats checks for MySQL
         for stats_type in config_dict.get('mysql').get('stats_types').split(','):
-            if config_dict.get('mysql').get('query_'+stats_type) and \
-                    config_dict.get('mysql').get('interval_'+stats_type):
-
+            if config_dict.get('mysql').get('query_' + stats_type) and \
+                    config_dict.get('mysql').get('interval_' + stats_type):
                 self.stats_checks[stats_type] = {
-                    'query': config_dict.get('mysql').get('query_'+stats_type),
-                    'interval': config_dict.get('mysql').get('interval_'+stats_type)
+                    'query': config_dict.get('mysql').get('query_' + stats_type),
+                    'interval': config_dict.get('mysql').get('interval_' + stats_type)
                 }
-                self.check_lastrun[stats_type] = (time.time()*1000)
+                self.check_lastrun[stats_type] = (time.time() * 1000)
 
-        self.sleep_interval = int(config_dict.get('mysql').get('sleep_interval', 500))/1000.0
+        self.sleep_interval = int(config_dict.get('mysql').get('sleep_interval', 500)) / 1000.0
 
-        #Which metrics do we allow to be sent to the backend?
+        # Which metrics do we allow to be sent to the backend?
         self.metrics = config_dict.get('metrics')
 
         return self.host, self.port, self.sleep_interval
@@ -62,7 +62,8 @@ class ThreadMySQL(ThreadBase):
                 if self.socket:
                     self.connection = mdb.connect(user=self.username, unix_socket=self.socket, passwd=self.password)
                 else:
-                    self.connection = mdb.connect(host=self.host, user=self.username, port=self.port, passwd=self.password)
+                    self.connection = mdb.connect(host=self.host, user=self.username, port=self.port,
+                                                  passwd=self.password)
 
                 return self.connection
             except Exception:
@@ -72,10 +73,9 @@ class ThreadMySQL(ThreadBase):
             connection_attempt += 1
             print('Attempting reconnect #{0}...'.format(connection_attempt))
             time.sleep(self.reconnect_delay)
-        
+
         # If we get out of the while loop, we've passed max_reconnect
         raise ThreadMySQLMaxReconnectException
-
 
     def stop(self):
         """ Stop running this thread and close connection """
@@ -94,12 +94,15 @@ class ThreadMySQL(ThreadBase):
             This is especially important for SHOW INNODB ENGINE
             which locks the engine for a short period of time
             """
-            time_now = time.time()*1000
+            time_now = time.time() * 1000
             check_threshold = float(self.stats_checks[check_type]['interval'])
             check_lastrun = self.check_lastrun[check_type]
             if (time_now - check_lastrun) > check_threshold:
                 cursor = self.connection.cursor()
                 cursor.execute(self.stats_checks[check_type]['query'])
+                # print('query: {}'.format(self.stats_checks[check_type]['query']))
+                if check_type == 'commit':
+                    continue
                 column_names = [i[0] for i in cursor.description]
 
                 """
